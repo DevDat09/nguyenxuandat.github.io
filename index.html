@@ -2347,6 +2347,7 @@
     </div>
   </div>
 
+  <script src="chatbot-data.js"></script>
   <script>
     // ── PHOTO LOAD ──
     const photoReal = document.querySelector('.photo-real');
@@ -2777,13 +2778,18 @@
         chatTyping.classList.add('visible');
         chatMsgs.scrollTop = chatMsgs.scrollHeight;
 
-        await new Promise(r => setTimeout(r, 400));
-
-        const { answer, suggestions } = findAnswer(text);
-        chatTyping.classList.remove('visible');
-        addMsg(answer, 'bot', suggestions);
-
-        isLoading = false;
+        try {
+          await new Promise(r => setTimeout(r, 400));
+          const { answer, suggestions } = findAnswer(text);
+          chatTyping.classList.remove('visible');
+          addMsg(answer, 'bot', suggestions);
+        } catch {
+          chatTyping.classList.remove('visible');
+          const lang = localStorage.getItem('lang') || 'vi';
+          addMsg(lang === 'en' ? 'Sorry, something went wrong.' : 'Xin lỗi, đã xảy ra lỗi.', 'bot');
+        } finally {
+          isLoading = false;
+        }
       }
 
       chatSend.addEventListener('click', () => send(chatInput.value));
@@ -2810,7 +2816,6 @@
       });
     })();
   </script>
-  <script src="chatbot-data.js"></script>
 </body>
 
 </html>
