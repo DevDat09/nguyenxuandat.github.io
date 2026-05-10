@@ -2749,13 +2749,20 @@
       function findAnswer(text) {
         const data = typeof CHATBOT_DATA !== 'undefined' ? CHATBOT_DATA : null;
         if (!data) return { answer: 'Chatbot chưa được cấu hình.', suggestions: [] };
+        const lang = localStorage.getItem('lang') || 'vi';
         const q = text.toLowerCase();
         for (const faq of data.faqs) {
           if (faq.keywords.some(kw => q.includes(kw.toLowerCase()))) {
-            return { answer: faq.answer, suggestions: faq.suggestions || [] };
+            return {
+              answer: faq[`answer_${lang}`] || faq.answer_vi,
+              suggestions: faq[`suggestions_${lang}`] || faq.suggestions_vi || []
+            };
           }
         }
-        return data.fallback;
+        return {
+          answer: data.fallback[`answer_${lang}`] || data.fallback.answer_vi,
+          suggestions: data.fallback[`suggestions_${lang}`] || data.fallback.suggestions_vi || []
+        };
       }
 
       async function send(text) {
