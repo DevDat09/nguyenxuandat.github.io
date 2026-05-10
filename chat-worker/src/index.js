@@ -1,4 +1,4 @@
-const SYSTEM_PROMPT = `You are a helpful AI assistant representing Nguyễn Xuân Đạt on his portfolio website. Answer questions about his professional background concisely in 2-4 sentences. Respond in the same language the user writes in (Vietnamese or English).
+const SYSTEM_PROMPT = `You are a helpful AI assistant representing Nguyễn Xuân Đạt on his portfolio website.
 
 Profile:
 - Name: Nguyễn Xuân Đạt
@@ -24,10 +24,41 @@ Contact:
 - Email: nguyen.xuan.dat9090@gmail.com
 - Phone / Zalo: 0392 082 123
 
-IMPORTANT — You MUST always respond with ONLY valid JSON, no other text, no markdown, no code blocks:
-{"answer":"your response here","suggestions":["short follow-up question 1","short follow-up question 2","short follow-up question 3"]}
+RULES:
+1. Answer questions about Dat's professional background concisely in 2-4 sentences.
+2. Respond in the SAME language the user writes in (Vietnamese or English).
+3. You MUST output ONLY a valid JSON object — no markdown, no explanation, no code fences.
+4. JSON format: {"answer":"your response here","suggestions":["question 1","question 2","question 3"]}
+5. suggestions = 3 short follow-up questions in the same language as the user, max 8 words each.`;
 
-The suggestions must be 3 short, natural follow-up questions in the SAME language as the user's message. Keep suggestions under 8 words each.`;
+const MODELS = [
+  'meta-llama/llama-3.3-70b-instruct:free',
+  'google/gemma-4-31b-it:free',
+  'meta-llama/llama-3.2-3b-instruct:free',
+  'google/gemma-4-26b-a4b-it:free',
+];
+
+async function callOpenRouter(model, messages, apiKey) {
+  const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+      'HTTP-Referer': 'https://devdat09.github.io',
+      'X-Title': 'NXD Portfolio Chatbot',
+    },
+    body: JSON.stringify({
+      model,
+      messages: [
+        { role: 'system', content: SYSTEM_PROMPT },
+        ...messages,
+      ],
+      max_tokens: 600,
+      temperature: 0.7,
+    }),
+  });
+  return res.json();
+}
 
 export default {
   async fetch(request, env) {
@@ -57,33 +88,41 @@ export default {
       });
     }
 
-    const orRes = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${env.OPENROUTER_API_KEY}`,
-        'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://devdat09.github.io',
-        'X-Title': 'NXD Portfolio Chatbot',
-      },
-      body: JSON.stringify({
-        model: 'google/gemma-4-26b-a4b-it:free',
-        messages: [
-          { role: 'system', content: SYSTEM_PROMPT },
-          ...messages.slice(-10),
-        ],
-        max_tokens: 600,
-        temperature: 0.7,
-      }),
-    });
+    const recentMessages = messages.slice(-10);
+    let raw = '';
+    let lastError = '';
 
-    const orData = await orRes.json();
-    const raw = orData.choices?.[0]?.message?.content ?? '';
+    for (const model of MODELS) {
+      try {
+        const data = await callOpenRouter(model, recentMessages, env.OPENROUTER_API_KEY);
 
-    let answer = raw || 'Xin lỗi, không có phản hồi.';
+        if (data.error) {
+          lastError = `[${model}] ${data.error.code}: ${data.error.message}`;
+          const retryAfter = data.error?.metadata?.retry_after_seconds;
+          if (data.error.code === 429 && retryAfter && retryAfter < 10) {
+            await new Promise(r => setTimeout(r, Math.ceil(retryAfter) * 1000 + 500));
+            const retry = await callOpenRouter(model, recentMessages, env.OPENROUTER_API_KEY);
+            if (!retry.error) {
+              raw = retry.choices?.[0]?.message?.content ?? '';
+              if (raw) break;
+            } else {
+              lastError += ` | retry failed: ${retry.error.message}`;
+            }
+          }
+          continue;
+        }
+
+        raw = data.choices?.[0]?.message?.content ?? '';
+        if (raw) break;
+      } catch (e) {
+        lastError = String(e);
+      }
+    }
+
+    let answer = raw || 'Xin lỗi, tôi đang gặp sự cố kỹ thuật. Vui lòng thử lại sau.';
     let suggestions = [];
 
     try {
-      // Trích JSON kể cả khi model thêm text thừa xung quanh
       const match = raw.match(/\{[\s\S]*\}/);
       if (match) {
         const parsed = JSON.parse(match[0]);
@@ -93,7 +132,7 @@ export default {
         }
       }
     } catch {
-      // Fallback: dùng raw text, không có suggestions
+      // fallback: use raw text as answer
     }
 
     return new Response(JSON.stringify({ content: [{ text: answer }], suggestions }), {
