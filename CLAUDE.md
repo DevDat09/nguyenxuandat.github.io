@@ -428,7 +428,31 @@ nav (fixed)
 
 ---
 
-## 11. Không làm (Anti-patterns)
+## 11. Icon Rules
+
+Có hai ngữ cảnh dùng icon — quy tắc khác nhau:
+
+| Ngữ cảnh | Loại | Ví dụ |
+|----------|------|-------|
+| UI/functional (contact, action, nav) | **SVG filled** `fill="var(--cyan)"` | Contact section icons |
+| Decorative (skill card category) | **Emoji** 24px | Skill cards |
+| Topology/diagram (project visual, hero) | **SVG stroke** `stroke="#00c8ff"` opacity thấp | Project cards, hero |
+
+### SVG Filled Icons (UI)
+```html
+<svg width="18" height="18" viewBox="0 0 24 24" fill="var(--cyan)">
+  <path d="..."/>
+</svg>
+```
+- Dùng `fill="var(--cyan)"`, **không** dùng `stroke`
+- Kích thước 18–22px trong icon box 46×46px
+- Chọn shape đặc, solid — nhìn vào là nhận ra ngay ở kích thước nhỏ
+- **Không dùng emoji** cho icon chức năng — màu sắc emoji không nhất quán với dark theme
+- **Không dùng icon library** (FontAwesome, Heroicons CDN, etc.)
+
+---
+
+## 12. Không làm (Anti-patterns)
 
 - Không dùng `border-radius > 16px` — giữ cảm giác angular, kỹ thuật
 - Không dùng shadow nặng như `box-shadow: 0 10px 30px rgba(0,0,0,0.5)` — tối trên tối vô nghĩa
@@ -436,8 +460,9 @@ nav (fixed)
 - Không dùng font sans-serif thông thường cho label/badge — phải JetBrains Mono
 - Không tạo thêm màu accent ngoài cyan/cyan2/amber
 - Không animate liên tục những thứ người dùng không hover
-- Không dùng icon library (FontAwesome, etc.) — dùng emoji hoặc SVG inline
+- Không dùng icon library (FontAwesome, etc.) — SVG inline hoặc emoji theo đúng ngữ cảnh (xem mục 11)
 - Không đặt text màu trắng thuần `#fff` — dùng `--text` (`#e2eaf2`) hoặc thấp hơn
+- Không dùng emoji làm icon UI/functional — chỉ dùng cho decorative (skill cards)
 
 ---
 
