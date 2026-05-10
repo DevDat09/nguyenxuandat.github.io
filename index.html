@@ -13,7 +13,7 @@
     style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
     font-src https://fonts.gstatic.com;
     img-src 'self' data: blob:;
-    connect-src https://nxd-chat-proxy.nxd-network.workers.dev https://formspree.io;
+    connect-src https://formspree.io;
     form-action https://formspree.io;
     frame-ancestors 'none';
     base-uri 'self';
@@ -2679,9 +2679,6 @@
 
     // ── CHATBOT ──
     (function () {
-      // Thay bằng URL Cloudflare Worker sau khi deploy
-      const WORKER_URL = 'https://nxd-chat-proxy.nxd-network.workers.dev';
-
       const chatBtn    = document.getElementById('chatBtn');
       const chatWindow = document.getElementById('chatWindow');
       const chatClose  = document.getElementById('chatClose');
@@ -2693,7 +2690,6 @@
 
       let isOpen    = false;
       let isLoading = false;
-      let history   = [];
 
       function toggleChat() {
         isOpen = !isOpen;
@@ -2717,7 +2713,7 @@
         wrap.className = `chat-msg ${role}`;
         const html = role === 'user'
           ? escHtml(text)
-          : text.replace(/\n/g, '<br>');
+          : escHtml(text).replace(/\n/g, '<br>');
         wrap.innerHTML = `<div class="chat-bubble">${html}</div>`;
 
         if (role === 'bot' && suggestions.length > 0) {
@@ -2750,6 +2746,18 @@
         chatMsgs.scrollTop = chatMsgs.scrollHeight;
       }
 
+      function findAnswer(text) {
+        const data = typeof CHATBOT_DATA !== 'undefined' ? CHATBOT_DATA : null;
+        if (!data) return { answer: 'Chatbot chưa được cấu hình.', suggestions: [] };
+        const q = text.toLowerCase();
+        for (const faq of data.faqs) {
+          if (faq.keywords.some(kw => q.includes(kw.toLowerCase()))) {
+            return { answer: faq.answer, suggestions: faq.suggestions || [] };
+          }
+        }
+        return data.fallback;
+      }
+
       async function send(text) {
         text = text.trim();
         if (!text || isLoading) return;
@@ -2758,28 +2766,15 @@
         chatChips.style.display = 'none';
         addMsg(text, 'user');
         chatInput.value = '';
-        history.push({ role: 'user', content: text });
 
         chatTyping.classList.add('visible');
         chatMsgs.scrollTop = chatMsgs.scrollHeight;
 
-        try {
-          const res = await fetch(WORKER_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ messages: history.slice(-10) })
-          });
-          if (!res.ok) throw new Error('api');
-          const data = await res.json();
-          const reply = data.content?.[0]?.text ?? 'Xin lỗi, không có phản hồi.';
-          const suggestions = Array.isArray(data.suggestions) ? data.suggestions : [];
-          history.push({ role: 'assistant', content: reply });
-          chatTyping.classList.remove('visible');
-          addMsg(reply, 'bot', suggestions);
-        } catch (err) {
-          chatTyping.classList.remove('visible');
-          addMsg('Xin lỗi, lỗi kết nối. Vui lòng thử lại sau.', 'bot');
-        }
+        await new Promise(r => setTimeout(r, 400));
+
+        const { answer, suggestions } = findAnswer(text);
+        chatTyping.classList.remove('visible');
+        addMsg(answer, 'bot', suggestions);
 
         isLoading = false;
       }
@@ -2808,6 +2803,7 @@
       });
     })();
   </script>
+  <script src="chatbot-data.js"></script>
 </body>
 
 </html>
